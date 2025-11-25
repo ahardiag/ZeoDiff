@@ -97,10 +97,25 @@ class GaussianDiffusion(nn.Module):
 			imgs.append(img.cpu().numpy())
 		return imgs
 
+	def p_sample_loop_no_append(self, model, shape, context=None):
+		device = next(model.parameters()).device
+            
+		b = shape[0]
+		# sampling starts from pure random noise
+		img = torch.randn(shape, device=device)
+	    
+		imgs = []
+
+		for i in tqdm(reversed(range(0, self.timesteps)), desc='sampling loop time step', total=self.timesteps):
+			img = self.p_sample(model, img, torch.full((b,), i, device=device, dtype=torch.long), i, context)
+		return img.cpu().numpy()[None,:] # to keep the original output format of p_sample_loop
+
 	@torch.no_grad()
 	def sample(self, model, grid_size, batch_size, channels, context=None):
-		return np.array(self.p_sample_loop(model, shape=(batch_size, channels, grid_size, grid_size, grid_size),context=context))
-   
+		#samples_tmp = np.array(self.p_sample_loop(model, shape=(batch_size, channels, grid_size, grid_size, grid_size),context=context))
+		#return np.array(self.p_sample_loop(model, shape=(batch_size, channels, grid_size, grid_size, grid_size),context=context))
+		return np.array(self.p_sample_loop_no_append(model, shape=(batch_size, channels, grid_size, grid_size, grid_size),context=context))
+
 	def progressive_sample(self, model, cell_model, directory,  shape, channels=3, context=None):
 		device = next(model.parameters()).device
 
@@ -125,14 +140,15 @@ class GaussianDiffusion(nn.Module):
 
 	@torch.no_grad()
 	def large_sample(self, model, cell_model, num_sample, directory, target_value=None, grid_size = 32, channels = 3):
-		num_50_cycle = num_sample // 50
-		left_over = num_sample - num_50_cycle*50
+		batch_size = 50
+		num_batch_size_cycle = num_sample // batch_size
+		left_over = num_sample - num_batch_size_cycle*batch_size
 
 		count = 1
-		for _ in range(num_50_cycle):
+		for _ in range(num_batch_size_cycle):
 				if target_value is not None:
-					context = torch.tensor([target_value]).repeat(50, channels, grid_size, grid_size, grid_size)
-				samples = self.sample(model, grid_size=grid_size, batch_size = 50, channels=channels, context = context)[-1]
+					context = torch.tensor([target_value]).repeat(batch_size, channels, grid_size, grid_size, grid_size)
+				samples = self.sample(model, grid_size=grid_size, batch_size = batch_size, channels=channels, context = context)[-1]
 				cell_param_list = cell_model(torch.tensor(samples))
 
 				for i in range(len(samples)):
@@ -148,7 +164,7 @@ class GaussianDiffusion(nn.Module):
 
 		for i in range(len(samples)):
 				arr = samples[i].reshape(channels,grid_size, grid_size, grid_size)
-				cell_param = [j*100 for j in cell_param_list[i]]
+				cell_param = [j*100 for j in cell_param_list[i]]	
 				write_visit_sample(arr, cell = cell_param, stem = 'sample_'+str(count), save_dir=directory)
 				count += 1
 
