@@ -1,6 +1,7 @@
 import torch
 import pytorch_lightning as pl
 import numpy as np
+import random
 import os
 from torch.utils.data import Dataset, random_split, DataLoader
 import matplotlib.pyplot as plt
@@ -46,42 +47,49 @@ def read_and_normalize_atom(data, grid_size = 32):
     return torch.tensor(arr)
 
     
-# For rotational augmentation
 def rotate(matrix1, matrix2, matrix3):
+    matrix1 = matrix1.reshape(32, 32, 32)
+    matrix2 = matrix2.reshape(32, 32, 32)
+    matrix3 = matrix3.reshape(32, 32, 32)
 
-	matrix1 = matrix1.reshape(32,32,32)
-	matrix2 = matrix2.reshape(32,32,32)
-	matrix3 = matrix3.reshape(32,32,32)
+    direction = random.choice(['x', 'y', 'z'])
 
-	direction = np.random.choice(['x', 'y', 'z'])
+    if direction == 'x':
+        dims = (1, 2)
+    elif direction == 'y':
+        dims = (0, 2)
+    else:
+        dims = (0, 1)	
 
-	if direction == 'x':
-		return torch.tensor(np.rot90(matrix1, k=1, axes=(1, 2)).copy()), torch.tensor(np.rot90(matrix2, k=1, axes=(1, 2)).copy()), torch.tensor(np.rot90(matrix3, k=1, axes=(1, 2)).copy())
-	elif direction == 'y':
-		return torch.tensor(np.rot90(matrix1, k=1, axes=(0, 2)).copy()), torch.tensor(np.rot90(matrix2, k=1, axes=(0, 2)).copy()), torch.tensor(np.rot90(matrix3, k=1, axes=(0, 2)).copy())
-	else:
-		return torch.tensor(np.rot90(matrix1, k=1, axes=(0, 1)).copy()), torch.tensor(np.rot90(matrix2, k=1, axes=(0, 1)).copy()), torch.tensor(np.rot90(matrix3, k=1, axes=(0, 1)).copy())
+    return (
+        torch.rot90(matrix1, k=1, dims=dims),
+        torch.rot90(matrix2, k=1, dims=dims),
+        torch.rot90(matrix3, k=1, dims=dims),
+    )
+import torch
+import random
 
-# For translational augmentation
 def translate(matrix1, matrix2, matrix3):
-    
-	dim = matrix1[0].shape[0]
+    # ensure shape
+    matrix1 = matrix1.reshape(32, 32, 32)
+    matrix2 = matrix2.reshape(32, 32, 32)
+    matrix3 = matrix3.reshape(32, 32, 32)
 
-	dx, dy, dz = np.random.randint(-dim//2, dim//2), np.random.randint(-dim//2, dim//2), np.random.randint(-dim//2, dim//2)
+    dim = matrix1.shape[0]
 
-	tr_matrix1 = np.roll(matrix1, shift=dx, axis=0)
-	tr_matrix1 = np.roll(tr_matrix1, shift=dy, axis=1)
-	tr_matrix1 = np.roll(tr_matrix1, shift=dz, axis=2) 
+    dx = random.randint(-dim // 2, dim // 2)
+    dy = random.randint(-dim // 2, dim // 2)
+    dz = random.randint(-dim // 2, dim // 2)
 
-	tr_matrix2 = np.roll(matrix2, shift=dx, axis=0)
-	tr_matrix2 = np.roll(tr_matrix2, shift=dy, axis=1)
-	tr_matrix2 = np.roll(tr_matrix2, shift=dz, axis=2) 
+    shifts = (dx, dy, dz)
+    dims = (0, 1, 2)
 
-	tr_matrix3 = np.roll(matrix3, shift=dx, axis=0)
-	tr_matrix3 = np.roll(tr_matrix3, shift=dy, axis=1)
-	tr_matrix3 = np.roll(tr_matrix3, shift=dz, axis=2) 
+    return (
+        torch.roll(matrix1, shifts=shifts, dims=dims),
+        torch.roll(matrix2, shifts=shifts, dims=dims),
+        torch.roll(matrix3, shifts=shifts, dims=dims),
+    )
 
-	return torch.tensor(tr_matrix1), torch.tensor(tr_matrix2), torch.tensor(tr_matrix3)
 
 # Visualize grids using matplotlib (not necessary)
 def visualize_3d(data, grid_idx):
@@ -101,32 +109,30 @@ def visualize_3d(data, grid_idx):
 # Read three grids and conduct data augmentation
 def read_and_normalize_3grid(file_address, augmentation, grid_size=32):
 
-	grid_file = file_address+'.griddata'
-	si_file = file_address+'.si'
-	o_file = file_address+'.O'
-    
-	energy_data = read_and_normalize(grid_file, grid_size).reshape(1,grid_size,grid_size,grid_size)
-	si_data = read_and_normalize_atom(si_file, grid_size).reshape(1,grid_size,grid_size,grid_size)
-	o_data = read_and_normalize_atom(o_file, grid_size).reshape(1,grid_size,grid_size,grid_size)
+    grid_file = file_address + '.griddata'
+    si_file   = file_address + '.si'
+    o_file    = file_address + '.O'
 
-	original_data = torch.concat((energy_data,si_data,o_data),dim=0)
+    # --- NO channel dimension here ---
+    energy_data = read_and_normalize(grid_file, grid_size).reshape(grid_size, grid_size, grid_size)
+    si_data     = read_and_normalize_atom(si_file, grid_size).reshape(grid_size, grid_size, grid_size)
+    o_data      = read_and_normalize_atom(o_file, grid_size).reshape(grid_size, grid_size, grid_size)
 
-	rotated_data = None
-	translated_data = None
+    # --- stack channels ONCE ---
+    original_data = torch.stack((energy_data, si_data, o_data), dim=0)  # [3,32,32,32]
 
-	if augmentation:
-		energy_data_rot, si_data_rot, o_data_rot = rotate(energy_data, si_data, o_data)
+    rotated_data = None
+    translated_data = None
 
-		energy_data_rot = energy_data_rot.reshape(1,grid_size,grid_size,grid_size)
-		si_data_rot =si_data_rot.reshape(1,grid_size,grid_size,grid_size)
-		o_data_rot = o_data_rot.reshape(1,grid_size,grid_size,grid_size)
+    if augmentation:
+        energy_rot, si_rot, o_rot = rotate(energy_data, si_data, o_data)
+        rotated_data = torch.stack((energy_rot, si_rot, o_rot), dim=0)
 
-		rotated_data = torch.concat((energy_data_rot,si_data_rot,o_data_rot),dim=0)
+        energy_tr, si_tr, o_tr = translate(energy_data, si_data, o_data)
+        translated_data = torch.stack((energy_tr, si_tr, o_tr), dim=0)
 
-		energy_data_trans, si_data_trans, o_data_trans = translate(energy_data, si_data, o_data)     
-		translated_data = torch.concat((energy_data_trans, si_data_trans, o_data_trans),dim=0)
-        
-	return original_data, rotated_data, translated_data
+    return original_data, rotated_data, translated_data
+
 
 # Prepare Dataset with data augmentation. VF, HC, HOA of each sample are also included
 class Three_Grid_Dataset(Dataset):
