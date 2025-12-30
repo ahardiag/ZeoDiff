@@ -35,3 +35,7 @@ def config():
 	# training
 	log_dir = "../logs_ae/"
 	property_file = "../data/properties.pickle"
+	
+	# cell parameter prediction model
+	c_model_dir = "models/lattice_regressor.ckpt"
+	c_dim_mults = (1,2,4)
