@@ -49,7 +49,7 @@ def main(_config):
 	
 	exp_name = f"{_config['exp_name']}"
 
-	denoising_diffusion_model = LDM(_config)
+	denoising_diffusion_model = DDPM(_config)
 
 	grid_data_module = GridDataModule(_config)
     
@@ -67,7 +67,7 @@ def main(_config):
 			denoising_diffusion_model.load_state_dict(state_dict['state_dict'])
 
 		os.makedirs(_config["log_dir"], exist_ok=True)
-		checkpoint_callback = ModelCheckpoint(filename=os.path.join(_config['save_dir'], 'ldm_{epoch:02d}-{val_loss:.6f}'),
+		checkpoint_callback = ModelCheckpoint(filename=os.path.join(_config['save_dir'], 'ddpm_{epoch:02d}-{val_loss:.6f}'),
 												monitor='val_loss',
 												verbose=True,
 												save_last=True,
