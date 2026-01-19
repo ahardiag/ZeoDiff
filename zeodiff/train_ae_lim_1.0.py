@@ -2,7 +2,7 @@ import os
 import copy
 import pytorch_lightning as pl
 import torch
-from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, TQDMProgressBar
 
 from dataset import GridDataModule
 from autoencoderldm3d import ContinuousVAELoss,AutoencoderKL, ddconfig, lossconfig
@@ -106,10 +106,10 @@ def main(_config):
         devices=_config["devices"],
         precision=_config["precision"],
         max_epochs=_config["max_epochs"],
-        callbacks=[checkpoint_cb, early_stop_cb],
+        callbacks=[checkpoint_cb, early_stop_cb,TQDMProgressBar(refresh_rate=100)],
         logger=logger,
-        limit_train_batches=100,      # TEST
-        limit_val_batches=50,        # TEST
+        limit_train_batches=1.0,      # whole training set
+        limit_val_batches=1.0,        # whole validation set
     )
     
     trainer.fit(model, datamodule)
