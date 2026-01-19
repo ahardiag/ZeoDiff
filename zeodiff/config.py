@@ -1,12 +1,11 @@
 from sacred import Experiment
 
-ex = Experiment("ddpm", save_git_info=False)
-
+ex = Experiment("ldm", save_git_info=False)
 
 @ex.config
 def config():
 
-	exp_name = "ddpm"
+	exp_name = "ldm"
 
 	seed = 42
 	train = True
@@ -23,6 +22,9 @@ def config():
 	timesteps = 1500
 	loss_type = "huber"
 
+	# autoencoder (VAE) for latent space
+	encoder_ckpt = "models/vae/ae_epoch=096_val_loss=0.003791.ckpt"
+	decoder_ckpt = "models/vae/ae_epoch=096_val_loss=0.003791.ckpt"
 
 	# cell parameter prediction model
 	c_model_dir = "models/lattice_regressor.ckpt"
@@ -30,9 +32,9 @@ def config():
 
 	# data
 	model_dir = "models/"
-	train_dataset = "../data/training/"
+	train_dataset = "../data/train/"
 	test_dataset = "../data/test/"
-	batch_size = 128 # batch size per gpu
+	batch_size = 64 # batch size per gpu
 	num_workers = 8
 	augmentation = True # apply augmentation on database (rotation and translation)
 	test_only_100 = False # test trial on dataset of size 100
@@ -41,15 +43,15 @@ def config():
 
 	# training
 	accelerator = "gpu"
-	n_gpu = 4
-	devices = 4
+	n_gpu = 1
+	devices = 1
 	num_nodes = 1
 	optimizer = "adam"
 	lr = 1e-4
-	log_dir = "../logs/"
-	max_epochs = 2000
+	log_dir = "../logs/ldm/"
+	max_epochs = 10
 	n_iter = 10000000
-	save_dir = "models/" # where models designated by callbacks will be stored
+	save_dir = "models/ldm" # where models designated by callbacks will be stored
 	grid_size = 32
 	strategy = "ddp" # DDPStrategy(find_unused_parameters=True) is now being used as default. If you want to change it, modify trainer part of run.py.
 	early_stopping = 50
