@@ -14,7 +14,7 @@ def config():
 	# ddpm model
 	# (UNET parameter)
 	dim = 32
-	dim_mults = (1,2,4)
+	dim_mults = (1,2,4) # 32x32x32 -> (1,2,4) to keep low for small images
 	channels = 3 
 	self_condition = False
 	target_prop = None
@@ -58,9 +58,11 @@ def config():
 	load_model = None
 
 
-	# evaluation
-	eval_model = "unconditional.ckpt"
-	sample_dir = "/samples/"
+	# sampling / evaluation
+	eval_model = "ldm/ldm_epoch=27-val_loss=0.106627.ckpt"
+	#eval_model = "unconditional.ckpt"
+	sample_dir = "../samples/"
 	sample_freq = 200
-	target_value = 0.05
-	n_sample = 10000
+	target_value = 0.05 # do not use None for unconditional sampling
+						# instead use self_condition = False
+	n_sample = 2

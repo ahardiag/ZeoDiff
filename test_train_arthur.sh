@@ -12,7 +12,7 @@ cd zeodiff
 python train_ddpm.py with train=True \
     train_dataset='../data/train/' \
     test_dataset='../data/test/' \
-    logs_dir='logs/ddpm' \
+    log_dir='logs/ddpm' \
     model_dir='models/ddpm' \
     target_prop='unconditional' \
     max_epochs=100 \

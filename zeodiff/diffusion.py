@@ -1,3 +1,5 @@
+from multiprocessing import context
+from os import name
 import torch
 import numpy as np
 from torch import  nn
@@ -97,6 +99,7 @@ class GaussianDiffusion(nn.Module):
 			imgs.append(img.cpu().numpy())
 		return imgs
 
+	@torch.no_grad()
 	def p_sample_loop_no_append(self, model, shape, context=None):
 		device = next(model.parameters()).device
             
@@ -165,6 +168,76 @@ class GaussianDiffusion(nn.Module):
 		for i in range(len(samples)):
 				arr = samples[i].reshape(channels,grid_size, grid_size, grid_size)
 				cell_param = [j*100 for j in cell_param_list[i]]	
+				write_visit_sample(arr, cell = cell_param, stem = 'sample_'+str(count), save_dir=directory)
+				count += 1
+
+	@torch.no_grad()
+	def sample_tensor(self, model, shape, context=None):
+		device = next(model.parameters()).device
+		b = shape[0]
+
+		img = torch.randn(shape, device=device)
+
+		for i in tqdm(
+			reversed(range(0, self.timesteps)),
+			desc='sampling loop time step',
+			total=self.timesteps
+		):
+			t = torch.full((b,), i, device=device, dtype=torch.long)
+			img = self.p_sample(model, img, t, i, context)
+
+		return img  # torch.Tensor
+	
+	@torch.no_grad()
+	def sample_from_latent(self, model, grid_size, batch_size, channels, context=None):
+		shape = (batch_size, channels, grid_size, grid_size, grid_size)
+		return self.sample_tensor(model, shape, context)
+
+	@torch.no_grad()
+	def large_sample_and_decode(self, ldm_model, cell_model, num_sample, directory, target_value=None):	
+		# retrieve both unet and decoder model from ldm
+		model = ldm_model.ema
+
+		# Define the grid size and channels in the latent space and real space
+		latent_dim = ldm_model.latent_dim
+		latent_channels = ldm_model.latent_channels
+		grid_size = ldm_model.grid_size
+		channels = ldm_model.channels
+		
+		batch_size = 10
+		num_batch_size_cycle = num_sample // batch_size
+		left_over = num_sample - num_batch_size_cycle*batch_size
+
+		count = 1
+		for _ in range(num_batch_size_cycle):
+				if target_value is not None:
+					context = torch.tensor([target_value]).repeat(batch_size, latent_channels, latent_dim, latent_dim, latent_dim)
+				latent_samples = self.sample_from_latent(model, grid_size=latent_dim, batch_size = batch_size, channels=latent_channels, context = context)
+				samples = ldm_model.decode_from_latent(
+					latent_samples.detach().to(dtype=torch.float32).to(ldm_model.device)
+					)
+				cell_param_list = cell_model(samples.detach())
+
+				for i in range(len(samples)):
+						arr = samples[i].cpu().numpy().reshape(channels,grid_size, grid_size, grid_size)
+						arr = np.asarray(arr, dtype=np.float32)
+						cell_param = [j*100 for j in cell_param_list[i].cpu().numpy()]
+						write_visit_sample(arr, cell = cell_param, stem = 'sample_'+str(count), save_dir=directory)
+						count += 1
+
+		if target_value is not None:
+			context = torch.tensor([target_value]).repeat(left_over, latent_channels, latent_dim, latent_dim, latent_dim)
+		
+		latent_samples = self.sample_from_latent(model, grid_size = latent_dim, batch_size = left_over, channels = latent_channels, context = context)
+		samples = ldm_model.decode_from_latent(
+			latent_samples.detach().to(dtype=torch.float32).to(ldm_model.device)
+			)
+		cell_param_list = cell_model(samples.detach())
+
+		for i in range(len(samples)):
+				arr = samples[i].cpu().numpy().reshape(channels,grid_size, grid_size, grid_size)
+				arr = np.asarray(arr, dtype=np.float32)
+				cell_param = [j*100 for j in cell_param_list[i].cpu().numpy()]
 				write_visit_sample(arr, cell = cell_param, stem = 'sample_'+str(count), save_dir=directory)
 				count += 1
 

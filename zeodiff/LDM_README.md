@@ -7,7 +7,31 @@ This implementation provides a complete Latent Diffusion Model pipeline that com
 2. **DDPM in Latent Space**: Diffusion model operating on the reduced space
 3. **VAE Decoder**: Reconstructs 32³ data from latent space
 
-This approach is **30-50x more efficient** than training DDPM directly on original space.
+## Quick Start
+
+### 1. Ensure you have a trained VAE
+
+```bash
+python train_ae_lim_1.0.py
+# Generates: models/vae/ae_epoch=096_val_loss=0.003791.ckpt (or similar)
+```
+
+### 2. Train LDM
+
+```bash
+python train_ldm.py with encoder_ckpt="models/vae/ae_epoch=096_val_loss=0.003791.ckpt" \
+        batch_size=32 \
+        lr=0.0001 \
+        max_epochs=100 \
+        log_dir="logs/ldm"
+```
+
+### 3. Generate Samples
+
+```bash
+python train_ldm.py with train=False n_sample=20
+```
+
 
 ## Files Created/Modified
 
@@ -35,10 +59,10 @@ class LDM(pl.LightningModule):
 - Efficient latent space representation (4³ instead of 32³)
 - Full integration with PyTorch Lightning
 
-### Training Scripts
+### Training an Inference script
 
-#### 2. **train_ldm.py** (New)
-Main training script for the LDM model.
+#### 2. **run_ldm.py** (New)
+##### Training the LDM model.
 
 **Usage:**
 ```bash
@@ -60,97 +84,9 @@ python train_ldm.py with encoder_ckpt="models/vae/ae_epoch=096_val_loss=0.003791
 - TensorBoard logging
 - Multi-GPU support (DDP)
 
-### Inference Scripts
-
-#### 3. **ldm_inference.py** (New)
-Complete inference pipeline for generation and reconstruction.
-
-**Class: `LDMInferencePipeline`**
-- `encode(x)`: Encode data to latent space
-- `decode(z)`: Decode from latent to original space
-- `sample(num_samples)`: Generate new samples
-- `encode_decode_test(x)`: Test reconstruction quality
-
-**Usage:**
-```python
-from ldm_inference import LDMInferencePipeline
-
-# Initialize pipeline
-pipeline = LDMInferencePipeline(
-    encoder_ckpt='models/vae/ae_epoch=096_val_loss=0.003791.ckpt',
-    ddpm_ckpt='models/ldm/best.ckpt',
-    device='cuda'
-)
-
-# Generate samples
-samples = pipeline.sample(num_samples=100, batch_size=10)
-
-# Test reconstruction
-x_recon = pipeline.encode_decode_test(real_data)
-```
-
-### Example Scripts
-
-#### 4. **ldm_example_pipeline.py** (New)
-Complete step-by-step example showing all stages of the pipeline:
-
+##### Sampling with LDM model.
 ```bash
-python ldm_example_pipeline.py
-```
-
-This demonstrates:
-1. Loading and inspecting data
-2. Initializing encoder/decoder
-3. Testing encode-decode cycle
-4. Initializing LDM model
-5. Encoding batch to latent
-6. Forward pass and loss computation
-7. Generating samples
-8. Saving results
-
-### Documentation
-
-#### 5. **LDM_WORKFLOW.md** (New)
-Comprehensive workflow guide covering:
-- Architecture overview
-- Step-by-step usage instructions
-- Configuration details
-- Performance considerations
-- Advanced usage examples
-- Troubleshooting
-
-## Quick Start
-
-### 1. Ensure you have a trained VAE
-
-```bash
-python train_ae_lim_1.0.py
-# Generates: models/vae/ae_epoch=096_val_loss=0.003791.ckpt (or similar)
-```
-
-### 2. Train LDM
-
-```bash
-python train_ldm.py with encoder_ckpt="models/vae/ae_epoch=096_val_loss=0.003791.ckpt" \
-        batch_size=32 \
-        lr=0.0001 \
-        max_epochs=100 \
-        log_dir="logs/ldm"
-```
-
-### 3. Generate Samples
-
-```python
-from ldm_inference import LDMInferencePipeline
-import torch
-
-pipeline = LDMInferencePipeline(
-    encoder_ckpt='models/vae/ae_epoch=096_val_loss=0.003791.ckpt',
-    ddpm_ckpt='logs/ldm_checkpoint.ckpt'
-)
-
-samples = pipeline.sample(num_samples=10, batch_size=2)
-torch.save(samples, 'samples.pt')
+python train_ldm.py with train=False n_sample=20
 ```
 
 ## Architecture Details
@@ -229,15 +165,19 @@ def training_step(self, batch, batch_idx):
 ### 3. Sampling Pipeline
 
 ```python
-def forward(self, x):
-    # Sample in latent space
-    latent_shape = (B, 4, 4, 4, 4)
-    z_samples = self.diffusion.p_sample_loop(model, latent_shape)
-    
-    # Decode to original space
-    x_samples = self.decode_from_latent(z_samples)
-    
-    return x_samples
+	def large_sample_and_decode(self, ldm_model, cell_model, num_sample, directory, target_value=None):	
+
+        # Sample from the latent pace
+		latent_samples = self.sample_from_latent(model, grid_size = latent_dim, batch_size = left_over, channels = latent_channels, context = context)
+		
+        # Decode using the autoencoder
+        samples = ldm_model.decode_from_latent(
+			latent_samples.detach().to(dtype=torch.float32).to(ldm_model.device)
+			)
+
+        # Generate the cell parameter from a previous model
+		cell_param_list = cell_model(samples.detach())
+
 ```
 
 ## Performance Metrics
@@ -254,9 +194,9 @@ def forward(self, x):
 
 ### Quality vs Speed
 
-- **Original DDPM**: High quality, 30-50x slower
-- **LDM**: Similar quality, much faster
-- **Quality Driver**: Mainly VAE quality, not DDPM
+- **Original DDPM**: High quality
+- **LDM**: quality, efficiency ?
+- **Quality Driver**: VAE or DDPM ?
 
 ## Configuration
 
@@ -316,7 +256,7 @@ python train_ldm.py --train
 
 **Solution**: Reduce batch size
 ```bash
-python train_ldm.py --batch_size 8 --train
+python train_ldm.py with batch_size=8 train=True
 ```
 
 ### Issue: Encoder checkpoint not loading
@@ -371,19 +311,4 @@ class LDM(pl.LightningModule):
 Implemented based on:
 1. Latent Diffusion Models: High-Resolution Image Synthesis with Latent Diffusion Models
 2. DDPM: Denoising Diffusion Probabilistic Models
-3. AutoencoderKL from Stable Diffusion
-
-## Next Steps
-
-1. **Try the example**: `python ldm_example_pipeline.py`
-2. **Train LDM**: `python train_ldm.py --train`
-3. **Generate samples**: Use `LDMInferencePipeline`
-4. **Evaluate**: Compare samples with original DDPM
-5. **Optimize**: Adjust hyperparameters for your use case
-
-## Support
-
-For issues or questions:
-1. Check [LDM_WORKFLOW.md](LDM_WORKFLOW.md) for detailed guide
-2. Review example scripts for usage patterns
-3. Check PyTorch Lightning and DDPM documentation
+3. AutoencoderKL from PoreGen
