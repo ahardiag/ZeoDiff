@@ -32,7 +32,7 @@ def config():
 	model_dir = "models/"
 	train_dataset = "../data/training/"
 	test_dataset = "../data/test/"
-	batch_size = 128 # batch size per gpu
+	batch_size = 32 # batch size per gpu
 	num_workers = 8
 	augmentation = True # apply augmentation on database (rotation and translation)
 	test_only_100 = False # test trial on dataset of size 100
@@ -41,13 +41,13 @@ def config():
 
 	# training
 	accelerator = "gpu"
-	n_gpu = 4
-	devices = 4
+	n_gpu = 1
+	devices = 1
 	num_nodes = 1
 	optimizer = "adam"
 	lr = 1e-4
 	log_dir = "../logs/"
-	max_epochs = 2000
+	max_epochs = 10
 	n_iter = 10000000
 	save_dir = "models/" # where models designated by callbacks will be stored
 	grid_size = 32

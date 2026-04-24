@@ -126,15 +126,15 @@ class DDPM(pl.LightningModule):
 			
 			train_batch_size = X.shape[0]
 
-			assert Y.shape[1]==3, 'So far, we only handle following FOUR parameters : VF, HC, HOA'
-			assert self.target_prop in ['VF', 'HC', 'HOA'], 'unknown property name is given'
+			assert Y.shape[1]==3, 'So far, we only handle following FOUR parameters : CON, CN_SI, CN_O'
+			assert self.target_prop in ['CON', 'CN_SI', 'CN_O'], 'unknown property name is given'
 
 			prop_name = self.target_prop
-			if prop_name == 'VF':
+			if prop_name == 'CON':
 				property = Y[:,0]
-			elif prop_name == 'HC':
+			elif prop_name == 'CN_SI':
 				property = Y[:,1]
-			else: # prop_name == 'HOA':
+			else: # prop_name == 'CN_O':
 				property = Y[:,2]
 
 
@@ -172,16 +172,16 @@ class DDPM(pl.LightningModule):
 			X,Y = batch
 			val_batch_size = X.shape[0]
 
-			assert Y.shape[1]==3, 'So far, we only handle four parameters : VF, HC, HOA'
-			assert self.target_prop in ['VF', 'HC', 'HOA'], 'unknown property name is given'
+			assert Y.shape[1]==3, 'So far, we only handle four parameters : CON, CN_SI, CN_O'
+			assert self.target_prop in ['CON', 'CN_SI', 'CN_O'], 'unknown property name is given'
 
 			prop_name = self.target_prop
 		
-			if prop_name == 'VF':
+			if prop_name == 'CON':
 				property = Y[:,0]
-			elif prop_name == 'HC':
+			elif prop_name == 'CN_SI':
 				property = Y[:,1]
-			else: # prop_name == 'HOA':
+			else: # prop_name == 'CN_O':
 				property = Y[:,2]
 
 			property_context = property.view(val_batch_size, 1, 1, 1, 1).repeat(1, self.channels, self.grid_size, self.grid_size, self.grid_size)
